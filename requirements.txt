@@ -1,0 +1,4 @@
+pyupbit
+schedule
+openai
+python-dotenv
