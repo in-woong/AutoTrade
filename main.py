@@ -1,32 +1,27 @@
-import time
-from trading_logic import trading_logic
-from utils.cleanup import CleanupManager
-from data.user_manager import UserManager
+from user_manager import UserManager, User
+from data_collector import DataCollector
+from trade_executor import TradeExecutor
+from ai_decision_maker import AIDecisionMaker
+from scheduler import Scheduler
+from config import Config
+from utils.logger import setup_logger
+
+logger = setup_logger("Main")
+
+def main():
+    user_manager = UserManager()
+    data_collector = DataCollector()
+    trade_executor = TradeExecutor(api_key=Config.UPBIT_API_KEY, secret_key=Config.UPBIT_SECRET_KEY)
+    ai_decision_maker = AIDecisionMaker()
+
+    scheduler = Scheduler(user_manager, data_collector, trade_executor, ai_decision_maker)
+
+    # Add user
+    user_manager.add_user(User(user_id="user1", api_key="key", secret_key="secret", trading_interval=2, gpt_preferences=["market_data"]))
+
+    # Schedule trading
+    scheduler.schedule_trading()
+    scheduler.start()
 
 if __name__ == "__main__":
-    log_dir = "./logs"
-    screenshot_dir = "./screenshots"
-    cleanup_manager = CleanupManager()
-    user_manager = UserManager()
-
-    while True:
-        try:
-            # Get active users from the database
-            active_users = user_manager.get_active_users()
-
-            # Loop through active users and execute trading logic
-            for user in active_users:
-                user_id = user["id"]
-                trading_logic(user_id)
-                time.sleep(1)  # Small delay between users
-
-            # Clean up old logs and screenshots every hour
-            cleanup_manager.clean_directory(log_dir, max_age_hours=24)
-            cleanup_manager.clean_directory(screenshot_dir, max_age_hours=24)
-
-            time.sleep(60)  # Wait for 1 minute before the next iteration
-        except KeyboardInterrupt:
-            print("Trading bot stopped by user.")
-            break
-        except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+    main()

@@ -1,6 +1,10 @@
 import logging
 
-def setup_logger():
-    """Sets up the logging configuration."""
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    return logging.getLogger()
+def setup_logger(name: str) -> logging.Logger:
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    return logger

@@ -1,10 +1,12 @@
 import os
+from dotenv import load_dotenv
 
-# Load configurations from environment variables
-API_KEY = os.getenv("UPBIT_API_KEY", "default_api_key")
-API_SECRET = os.getenv("UPBIT_API_SECRET", "default_api_secret")
-BASE_URL = os.getenv("BASE_URL", "https://api.upbit.com/v1")
+load_dotenv()
 
-# Other global configurations (if needed)
-DEFAULT_TRADE_AMOUNT = "0.01"  # Example: Default trade amount
-DEFAULT_TRADE_PRICE = "5000"  # Example: Default trade price
+class Config:
+    ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
+    TRADING_INTERVAL = int(os.getenv("TRADING_INTERVAL", 2))  # 기본 2시간 간격
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    UPBIT_API_KEY = os.getenv("UPBIT_API_KEY")
+    UPBIT_SECRET_KEY = os.getenv("UPBIT_SECRET_KEY")
+    MINIMUM_ORDER_AMOUNT = float(os.getenv("MINIMUM_ORDER_AMOUNT", 5000))  # 최소 주문 금액
