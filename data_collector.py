@@ -11,6 +11,10 @@ import base64
 import os
 import pandas as pd
 import time
+from ta.trend import MACD, SMAIndicator, EMAIndicator
+from ta.momentum import RSIIndicator, StochasticOscillator
+from ta.volatility import BollingerBands, AverageTrueRange
+from ta.volume import OnBalanceVolumeIndicator, VolumeWeightedAveragePrice
 from typing import Optional
 import pyupbit
 import requests
@@ -20,11 +24,6 @@ import logging
 logger = logging.getLogger("DataCollector")
 
 class DataCollector:
-    def collect_market_data(self, symbol: str) -> Dict[str, Any]:
-        current_price = pyupbit.get_current_price(symbol)
-        orderbook = pyupbit.get_orderbook(tickers=[symbol])  # 오더북 데이터
-        return {"symbol": symbol, "current_price": current_price, "orderbook": orderbook[0]}
-
     def collect_fear_greed_index(self) -> str:
         try:
             response = requests.get("https://api.alternative.me/fng/")  # 공포와 탐욕 지수 API
@@ -63,37 +62,50 @@ class DataCollector:
         """
         Add technical indicators (RSI, MACD, Bollinger Bands, Stochastic) to the DataFrame.
         """
-        try:
-            # RSI
-            delta = df['close'].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-            rs = gain / loss
-            df['rsi'] = 100 - (100 / (1 + rs))
+        # 기본 지표들
+        bb = BollingerBands(close=df['close'])
+        macd = MACD(close=df['close'])
+        rsi = RSIIndicator(close=df['close'])
+        stoch = StochasticOscillator(high=df['high'], low=df['low'], close=df['close'])
+        atr = AverageTrueRange(high=df['high'], low=df['low'], close=df['close'])
+        obv = OnBalanceVolumeIndicator(close=df['close'], volume=df['volume'])
+        vwap = VolumeWeightedAveragePrice(high=df['high'], low=df['low'], close=df['close'],
+                                          volume=df['volume'])
 
-            # MACD
-            ema_12 = df['close'].ewm(span=12, adjust=False).mean()
-            ema_26 = df['close'].ewm(span=26, adjust=False).mean()
-            df['macd'] = ema_12 - ema_26
-            df['macd_signal'] = df['macd'].ewm(span=9, adjust=False).mean()
+        # 이동평균선
+        df['ma5'] = SMAIndicator(close=df['close'], window=5).sma_indicator()
+        df['ma20'] = SMAIndicator(close=df['close'], window=20).sma_indicator()
+        df['ma60'] = SMAIndicator(close=df['close'], window=60).sma_indicator()
+        df['ma120'] = SMAIndicator(close=df['close'], window=120).sma_indicator()
 
-            # Bollinger Bands
-            rolling_mean = df['close'].rolling(window=20).mean()
-            rolling_std = df['close'].rolling(window=20).std()
-            df['bb_upper'] = rolling_mean + (rolling_std * 2)
-            df['bb_lower'] = rolling_mean - (rolling_std * 2)
-            df['bb_width'] = (df['bb_upper'] - df['bb_lower']) / rolling_mean
+        # 볼린저 밴드
+        df['bb_upper'] = bb.bollinger_hband()
+        df['bb_middle'] = bb.bollinger_mavg()
+        df['bb_lower'] = bb.bollinger_lband()
+        df['bb_width'] = bb.bollinger_wband()
 
-            # Stochastic Oscillator
-            low_14 = df['low'].rolling(window=14).min()
-            high_14 = df['high'].rolling(window=14).max()
-            df['stoch_k'] = 100 * (df['close'] - low_14) / (high_14 - low_14)
-            df['stoch_d'] = df['stoch_k'].rolling(window=3).mean()
+        # MACD
+        df['macd'] = macd.macd()
+        df['macd_signal'] = macd.macd_signal()
+        df['macd_diff'] = macd.macd_diff()
 
-            return df
-        except Exception as e:
-            logger.error(f"Error adding technical indicators: {e}")
-            return df
+        # RSI
+        df['rsi'] = rsi.rsi()
+
+        # Stochastic
+        df['stoch_k'] = stoch.stoch()
+        df['stoch_d'] = stoch.stoch_signal()
+
+        # ATR
+        df['atr'] = atr.average_true_range()
+
+        # OBV
+        df['obv'] = obv.on_balance_volume()
+
+        # VWAP
+        df['vwap'] = vwap.volume_weighted_average_price()
+
+        return df
 
     def get_trading_data(self) -> Dict[str, Any]:
         """
@@ -203,6 +215,14 @@ class DataCollector:
             )
             time.sleep(self.config.CHART_LOAD_WAIT)
 
+            # 3분 간격 설정
+            if not self.select_3min_interval(driver):
+                logger.error("Failed to select 3-minute interval.")
+
+            # 볼린저 밴드 설정
+            if not self.select_bollinger_band(driver):
+                logger.error("Failed to select Bollinger Band.")
+
             # 디버깅 디렉토리 설정
             if self.config.ENVIRONMENT == 'EC2':
                 debug_dir = "/home/ubuntu/bitcoin_chart_debug"
@@ -239,3 +259,60 @@ class DataCollector:
         except Exception as e:
             logger.error(f"Error encoding image to Base64: {e}")
             return ""
+
+    def select_bollinger_band(self, driver):
+        """
+        볼린저 밴드 설정을 위한 함수.
+        """
+        menu_xpath = "/html/body/div[1]/div[2]/div[3]/span/div/div/div[1]/div/div/cq-menu[3]"
+        option_xpath = '//*[@id="fullChartiq"]/div/div/div[1]/div/div/cq-menu[3]/cq-menu-dropdown/cq-scroll/cq-studies/cq-studies-content/cq-item[15]'
+        return self.click_option_with_scroll(driver, menu_xpath, option_xpath)
+
+    def select_3min_interval(self, driver):
+        """
+        3분 간격 설정을 위한 함수.
+        """
+        menu_xpath = "/html/body/div[1]/div[2]/div[3]/span/div/div/div[1]/div/div/cq-menu[1]/span/cq-clickable"
+        option_xpath = "/html/body/div[1]/div[2]/div[3]/span/div/div/div[1]/div/div/cq-menu[1]/cq-menu-dropdown/cq-item[3]"
+        return self.click_option_with_scroll(driver, menu_xpath, option_xpath)
+
+    def click_option_with_scroll(self, driver, menu_xpath: str, option_xpath: str, wait_time: int = 10):
+        """
+        Selenium WebDriver를 사용하여 특정 옵션을 클릭하며, 화면에 표시되지 않은 경우 스크롤로 접근.
+
+        Args:
+            driver: Selenium WebDriver 객체.
+            menu_xpath: 메뉴 버튼의 XPath.
+            option_xpath: 선택할 옵션의 XPath.
+            wait_time: 대기 시간 (초 단위, 기본값: 10).
+
+        Returns:
+            성공 여부 (True/False).
+        """
+        try:
+            # 메뉴 버튼 클릭
+            menu_button = WebDriverWait(driver, wait_time).until(
+                EC.element_to_be_clickable((By.XPATH, menu_xpath))
+            )
+            menu_button.click()
+            time.sleep(0.5)  # 메뉴 로딩 대기
+
+            # 옵션 버튼 찾기
+            option_button = WebDriverWait(driver, wait_time).until(
+                EC.presence_of_element_located((By.XPATH, option_xpath))
+            )
+
+            # 강제 스크롤로 옵션 버튼 노출
+            driver.execute_script("arguments[0].scrollIntoView(true);", option_button)
+            time.sleep(0.5)  # 스크롤 후 대기
+
+            # 옵션 버튼 클릭
+            WebDriverWait(driver, wait_time).until(
+                EC.element_to_be_clickable((By.XPATH, option_xpath))
+            ).click()
+            logger.info(f"Successfully clicked option: {option_xpath}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error in click_option_with_scroll: {e}")
+            return False

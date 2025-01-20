@@ -4,3 +4,4 @@ openai
 python-dotenv
 webdriver-manager
 selenium
+ta

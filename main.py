@@ -4,11 +4,11 @@ from trade_executor import TradeExecutor
 from ai_decision_maker import AIDecisionMaker
 from scheduler import Scheduler
 from config import Config
-from utils.logger import setup_logger
 import schedule
 import time
+from utils.logger import setup_logger
 
-logger = setup_logger("Main")
+logger = setup_logger("Main", "application.log")
 
 def main():
     user_manager = UserManager()
