@@ -12,18 +12,27 @@ class Scheduler:
         self.trade_executor = trade_executor
         self.ai_decision_maker = ai_decision_maker
 
-    def schedule_trading(self):
-        for user_id, user in self.user_manager.users.items():
-            schedule.every(user.trading_interval).hours.do(self.run_trading_cycle, user_id)
-
     def run_trading_cycle(self, user_id: str):
         user = self.user_manager.get_user(user_id)
         if not user:
             return
 
         market_data = self.data_collector.collect_market_data("KRW-BTC")
-        decision = self.ai_decision_maker.get_decision(user.gpt_preferences, market_data)
-        self.trade_executor.execute_trade(decision)
+        fgi = self.data_collector.collect_fear_greed_index()
+        news = self.data_collector.collect_news()
+        chart_path = self.data_collector.capture_chart()
+
+        # Reflection 데이터 (예시)
+        reflection = {"past_trades": "Example reflection data"}
+
+        decision = self.ai_decision_maker.get_decision(user.gpt_preferences, market_data, reflection)
+
+        if decision.get("decision") in ["buy", "sell"]:
+            self.trade_executor.execute_trade(decision)
+
+    def schedule_trading(self):
+        for user_id, user in self.user_manager.users.items():
+            schedule.every(user.trading_interval).hours.do(self.run_trading_cycle, user_id)
 
     def start(self):
         while True:

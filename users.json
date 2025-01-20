@@ -1,0 +1,16 @@
+[
+  {
+    "user_id": "user1",
+    "api_key": "your-upbit-api-key-1",
+    "secret_key": "your-upbit-secret-key-1",
+    "trading_interval": 2,
+    "gpt_preferences": ["market_data", "news"]
+  },
+  {
+    "user_id": "user2",
+    "api_key": "your-upbit-api-key-2",
+    "secret_key": "your-upbit-secret-key-2",
+    "trading_interval": 4,
+    "gpt_preferences": ["technical_analysis"]
+  }
+]

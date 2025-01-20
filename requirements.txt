@@ -2,3 +2,5 @@ pyupbit
 schedule
 openai
 python-dotenv
+webdriver-manager
+selenium
